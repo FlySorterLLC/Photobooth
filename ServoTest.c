@@ -3,6 +3,7 @@
 
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <termios.h>
 
@@ -50,7 +51,7 @@ int maestroSetTarget(int fd, unsigned char channel, unsigned short target)
   return 0;
 }
  
-int main()
+int main(int argc, char **argv)
 {
   // Open the Maestro's virtual COM port.
   const char * device = "/dev/ttyACM0";  // Linux
@@ -71,13 +72,26 @@ int main()
   tcsetattr(fd, TCSANOW, &options);
 
   printf("Options set.\n");
+
+  int servoNum = 0;
+
+  if ( argc > 1 ) {
+    servoNum = atoi(argv[1]);
+  }
+
  
-  int position = maestroGetPosition(fd, 0);
+  int position = maestroGetPosition(fd, servoNum);
   printf("Current position is %d.\n", position);
- 
-  int target = (position < 5000) ? 8000 : 4000;
+
+  int target = 0;
+  if ( argc > 2 ) {
+    target = atoi(argv[2]);
+  } else {
+    target = (position < 5000) ? 8000 : 4000;
+  }
+
   printf("Setting target to %d (%d us).\n", target, target/4);
-  maestroSetTarget(fd, 0, target);
+  maestroSetTarget(fd, servoNum, target);
  
   close(fd);
   return 0;

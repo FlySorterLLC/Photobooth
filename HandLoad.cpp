@@ -125,7 +125,7 @@ int main(int argc, char **argv)
 
     // Close the gate and take a picture or two!
     maestroSetTarget(servoFD, 0, INLET_GATE_CLOSED);
-    usleep(1000000);
+    usleep(2500000);
 
     CGrabResultPtr ptrGrabResult;
     char filename[100];
@@ -156,7 +156,8 @@ int main(int argc, char **argv)
         // Convert to OpenCV Mat
         fc.Convert(image, ptrGrabResult);
         Mat cimg(ptrGrabResult->GetHeight(), ptrGrabResult->GetWidth(),
-          CV_8UC3, (uint8_t *)image.GetBuffer());
+          CV_8UC3, (uint8_t *)image.GetBuffer()), rs;
+        // resize(cimg, rs, Size(), 0.25, 0.25);
         imwrite(filename, cimg);
       } else {
         cout << "Error: " << ptrGrabResult->GetErrorCode() << " "
@@ -174,7 +175,8 @@ int main(int argc, char **argv)
         // Convert to OpenCV Mat
         fc.Convert(image, ptrGrabResult);
         Mat cimg(ptrGrabResult->GetHeight(), ptrGrabResult->GetWidth(),
-          CV_8UC3, (uint8_t *)image.GetBuffer());
+          CV_8UC3, (uint8_t *)image.GetBuffer()), rs;
+        // resize(cimg, rs, Size(), 0.25, 0.25);
         imwrite(filename, cimg);
       } else {
         cout << "Error: " << ptrGrabResult->GetErrorCode() << " "

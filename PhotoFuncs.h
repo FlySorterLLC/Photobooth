@@ -5,11 +5,11 @@
 #ifndef __PHOTOFUNCS_H__
 #define __PHOTOFUNCS_H__
 
-#define  INLET_GATE_OPEN   7100
-#define  INLET_GATE_CLOSED 5400
+#define  INLET_GATE_OPEN   7000
+#define  INLET_GATE_CLOSED 5600
 
-#define OUTLET_GATE_OPEN   4500
-#define OUTLET_GATE_CLOSED 6500
+#define OUTLET_GATE_OPEN   5700
+#define OUTLET_GATE_CLOSED 7000
 
 int maestroGetPosition(int fd, unsigned char channel);
 int maestroSetTarget(int fd, unsigned char channel, unsigned short target);
