@@ -1,0 +1,9 @@
+# Binaries
+ServoTest
+Photobooth
+
+# Object files
+*.o
+
+# Output images
+images/
