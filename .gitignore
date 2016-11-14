@@ -1,9 +1,11 @@
 # Binaries
 ServoTest
 Photobooth
+CameraTest
 
 # Object files
 *.o
 
 # Output images
 images/
+Samples/

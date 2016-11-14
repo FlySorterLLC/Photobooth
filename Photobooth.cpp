@@ -22,6 +22,14 @@
 
 */
 
+
+
+#define  INLET_GATE_OPEN   7100
+#define  INLET_GATE_CLOSED 5400
+
+#define OUTLET_GATE_OPEN   4500
+#define OUTLET_GATE_CLOSED 6500
+
 // NOTE: The Maestro's serial mode must be set to "USB Dual Port".
 
 // Gets the position of a Maestro channel.
@@ -74,7 +82,7 @@ int main()
     perror(servoCtrl);
     return 1;
   } else {
-    printf("FD opened: %d.\n", fd);
+    printf("Servo FD opened: %d.\n", fd);
   }
  
   struct termios options;
@@ -84,14 +92,22 @@ int main()
   options.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
   tcsetattr(fd, TCSANOW, &options);
 
-  printf("Options set.\n");
+  printf("Servo port options set.\n");
  
-  int position = maestroGetPosition(fd, 0);
-  printf("Current position is %d.\n", position);
+  printf("Current positions are %d and %d.\n", maestroGetPosition(fd, 0),
+    maestroGetPosition(fd, 1));
  
-  int target = (position < 5000) ? 6000 : 4000;
-  printf("Setting target to %d (%d us).\n", target, target/4);
-  maestroSetTarget(fd, 0, target);
+  maestroSetTarget(fd, 0, INLET_GATE_OPEN);
+  maestroSetTarget(fd, 1, OUTLET_GATE_OPEN);
+
+  usleep(1000*1000);
+
+  printf("Current positions are %d and %d.\n", maestroGetPosition(fd, 0),
+    maestroGetPosition(fd, 1));
+
+  maestroSetTarget(fd, 0, INLET_GATE_CLOSED);
+  maestroSetTarget(fd, 1, OUTLET_GATE_CLOSED);
+  maestroSetTarget(fd, 1, OUTLET_GATE_CLOSED);
  
   close(fd);
   return 0;
