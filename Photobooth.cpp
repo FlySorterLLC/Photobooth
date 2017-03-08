@@ -1,6 +1,6 @@
-/* Copyright (c) 2016, FlySorter LLC *
- *                                   *
- *                                   */ 
+/* Copyright (c) 2016/2017, FlySorter LLC *
+ *                                        *
+ *                                        */ 
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -8,7 +8,7 @@
 #include <termios.h>
 
 /* Here's what we do:
-   - Set up GPIOs.
+   - Find Arduino serial port. Open in, set up GPIOs.
    - Find dispenser serial port. Open it, put dispenser into USB mode.
    - Find servo controller USB port. Open it, configure controller.
    - Find two Basler cameras. Configure them.
@@ -21,7 +21,6 @@
        - Move servos, move fly to vial, move servos
 
 */
-
 
 
 #define  INLET_GATE_OPEN   7100

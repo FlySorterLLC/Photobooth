@@ -1,7 +1,11 @@
 #include <pylon/PylonIncludes.h>
+#include <pylon/ImagePersistence.h>
+#include <unistd.h>
+#include "opencv2/core/core.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
+#include "opencv2/highgui/highgui.hpp"
 
-#include "Samples/C++/include/ConfigurationEventPrinter.h"
-#include "Samples/C++/include/ImageEventPrinter.h"
+using namespace cv;
 
 // Namespace for using pylon objects.
 using namespace Pylon;
@@ -9,68 +13,77 @@ using namespace Pylon;
 // Namespace for using cout.
 using namespace std;
 
-//Example of an image event handler.
-class CImageSaver : public CImageEventHandler
-{
-public:
-    virtual void OnImageGrabbed( CInstantCamera& camera, const CGrabResultPtr& ptrGrabResult)
-    {
-        cout << "Got result." << endl;
-        if (ptrGrabResult->GrabSucceeded())
-        {
-            CPylonImage image;
-            image.AttachGrabResultBuffer( ptrGrabResult);
-            cout << "Got image." << endl;
-            image.Save(ImageFileFormat_Png, "images/sample.png");
-            cout << "Saved." << endl;
-            image.Release();
-            cout << "Released." << endl;
-        }
-
-
-    }
-};
-
 int main(int argc, char* argv[])
 {
     // The exit code of the sample application.
     int exitCode = 0;
-    CGrabResultPtr ptrGrabResult;
 
     // Before using any pylon methods, the pylon runtime must be initialized.
     PylonInitialize();
 
     try
     {
-        // Create an instant camera object with the camera device found first.
-        // As soon as this object goes out of scope, the thread is killed and
-        // no callbacks occur.
-        CInstantCamera camera( CTlFactory::GetInstance().CreateFirstDevice());
 
-        // Print the model name of the camera.
-        cout << "Using device " << camera.GetDeviceInfo().GetModelName() << endl;
+        // Get the transport layer factory.
+        CTlFactory& tlFactory = CTlFactory::GetInstance();
 
-        camera.RegisterConfiguration( new CSoftwareTriggerConfiguration, RegistrationMode_ReplaceAll, Cleanup_Delete);
-        camera.RegisterConfiguration( new CConfigurationEventPrinter, RegistrationMode_Append, Cleanup_Delete);
-        camera.RegisterImageEventHandler( new CImageEventPrinter, RegistrationMode_Append, Cleanup_Delete);
-        camera.RegisterImageEventHandler( new CImageSaver, RegistrationMode_Append, Cleanup_Delete);
-        camera.Open();
+        // Get all attached devices and exit application if
+        // two cameras aren't found
+        DeviceInfoList_t devices;
+        if ( tlFactory.EnumerateDevices(devices) != 2 )
+        {
+            cout << "Found " << devices.size() << " cameras." << endl;
+            throw RUNTIME_EXCEPTION( "Did not find exactly two cameras.");
+        }
+        CInstantCamera upper, lower;
+        upper.Attach(tlFactory.CreateDevice( devices[0] ) ); upper.Open();
+        lower.Attach(tlFactory.CreateDevice( devices[1] ) ); lower.Open();
 
-        cout << "Opened." << endl;
-        if (camera.CanWaitForFrameTriggerReady()) {
-            camera.StartGrabbing( GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
-            cout << "Started grabbing." << endl;
-            if ( camera.WaitForFrameTriggerReady( 100, TimeoutHandling_ThrowException))
-            {
-                camera.ExecuteSoftwareTrigger();
-                cout << "Triggered." << endl;
+        CGrabResultPtr ptrGrabResult;
+        char filename[100]; int n;
+
+        CImageFormatConverter fc;
+	fc.OutputPixelFormat = PixelType_BGR8packed;
+        CPylonImage image;
+
+        upper.StartGrabbing(3); n=0;
+        usleep(1000000);
+        lower.StartGrabbing(3);
+        while ( upper.IsGrabbing() ) {
+            upper.RetrieveResult(5000, ptrGrabResult, TimeoutHandling_ThrowException);
+            if ( ptrGrabResult->GrabSucceeded()) {
+                snprintf(filename, 100, "images/Upper%03d.png", n++);
+                cout << "Writing image to " << filename << endl;
+                // Convert to OpenCV Mat
+		fc.Convert(image, ptrGrabResult);
+		Mat cimg(ptrGrabResult->GetHeight(), ptrGrabResult->GetWidth(),
+			CV_8UC3, (uint8_t *)image.GetBuffer());
+		imwrite(filename, cimg);
+                //CImagePersistence::Save( ImageFileFormat_Png, filename, ptrGrabResult);
+            } else {
+                cout << "Error: " << ptrGrabResult->GetErrorCode() << " " << ptrGrabResult->GetErrorDescription() << endl;
             }
-        } else {
-            cout << "Can't wait for frame trigger on this camera?" << endl;
         }
 
-        cout << "Sleeping." << endl;
-        WaitObject::Sleep( 3*1000);
+        n=0;
+        while ( lower.IsGrabbing() ) {
+            lower.RetrieveResult(5000, ptrGrabResult, TimeoutHandling_ThrowException);
+            if ( ptrGrabResult->GrabSucceeded()) {
+                snprintf(filename, 100, "images/Lower%03d.png", n++);
+                cout << "Writing image to " << filename << endl;
+                // Convert to OpenCV Mat
+		fc.Convert(image, ptrGrabResult);
+		Mat cimg(ptrGrabResult->GetHeight(), ptrGrabResult->GetWidth(),
+			CV_8UC3, (uint8_t *)image.GetBuffer());
+		imwrite(filename, cimg);
+                //CImagePersistence::Save( ImageFileFormat_Png,  filename, ptrGrabResult);
+            } else {
+                cout << "Error: " << ptrGrabResult->GetErrorCode() << " " << ptrGrabResult->GetErrorDescription() << endl;
+            }
+        }
+
+        upper.Close();
+        lower.Close();
 
     }
     catch (const GenericException &e)
@@ -80,6 +93,8 @@ int main(int argc, char* argv[])
         << e.GetDescription() << endl;
         exitCode = 1;
     }
+
+
 
     // Releases all pylon resources.
     PylonTerminate();

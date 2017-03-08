@@ -2,6 +2,10 @@
 ServoTest
 Photobooth
 CameraTest
+ArduinoTest
+OpenCVTest
+DispenserTest
+GPIOTest
 
 # Object files
 *.o
