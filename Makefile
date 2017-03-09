@@ -13,7 +13,7 @@ CVLFLAGS   := -lopencv_core -lopencv_imgproc -lopencv_highgui
 all: Photobooth ServoTest CameraTest GPIOTest ArduinoTest DispenserTest OpenCVTest
 
 Photobooth: Photobooth.o
-	 $(LD) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+	 $(LD) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(CVLFLAGS) $(WPLFLAGS)
 
 Photobooth.o: Photobooth.cpp
 	 $(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<

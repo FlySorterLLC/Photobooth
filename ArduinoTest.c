@@ -16,7 +16,7 @@ int serialport_read_until(int fd, char* buf, char until, int buf_max, int timeou
         if( n==0 ) {
             usleep( 1 * 1000 );  // wait 1 msec try again
             timeout--;
-            if( timeout==0 ) return -2;
+            if( timeout==0 ) { buf[i]=0; return -2; }
             continue;
         }
         // printf("serialport_read_until: i=%d, n=%d b='%c'\n",i,n,b[0]); // debug
@@ -28,8 +28,10 @@ int serialport_read_until(int fd, char* buf, char until, int buf_max, int timeou
     return 0;
 }
 
-int main()
+int main(int argc, char **argv)
 {
+
+  printf("Argc is %d.\n", argc);
   // Open the Arduino's virtual COM port.
   const char * device = "/dev/ttyUSB0";
   int fd = open(device, O_RDWR | O_NONBLOCK );
@@ -85,13 +87,21 @@ int main()
   char versionString[100];
   const char *verCmd = "A\n";
 
-  int n = write(fd, verCmd, strlen(verCmd));
-  if ( n != strlen(verCmd) )
+  int n, l;
+  if ( argc > 1 ) {
+    l = strlen(argv[1]);
+    n = write(fd, argv[1], l);
+  } else {
+    l = strlen(verCmd);
+    n = write(fd, verCmd, l);
+  }
+
+  if ( n != l )
   {
     perror("error writing");
     return -1;
   }
-  printf("Wrote command: %s (%d bytes)", verCmd, n);
+  printf("Wrote command: %s (%d bytes)", (argc > 1 ) ? argv[1] : verCmd, n);
 
   usleep(500000);
   

@@ -10,17 +10,24 @@
 // See the "Serial Servo Commands" section of the user's guide.
 int maestroGetPosition(int fd, unsigned char channel)
 {
+  int n;
   unsigned char command[] = {0x90, channel};
-  if(write(fd, command, sizeof(command)) == -1)
+  n = write(fd, command, sizeof(command));
+  if(n == -1)
   {
     perror("error writing");
     return -1;
   }
-  printf("mgp: wrote command %02X %02X.\n", command[0], command[1]);
+  printf("mgp: wrote command (%d bytes) %02X %02X.\n", n,
+    command[0], command[1]);
+
+  usleep(50000);
  
   unsigned char response[2];
-  if(read(fd,response,2) != 2)
+  n = read(fd, response, 2);
+  if( n != 2)
   {
+    printf("n = %d\n", n);
     perror("error reading");
     return -1;
   }
@@ -68,7 +75,7 @@ int main()
   int position = maestroGetPosition(fd, 0);
   printf("Current position is %d.\n", position);
  
-  int target = (position < 5000) ? 6000 : 4000;
+  int target = (position < 5000) ? 8000 : 4000;
   printf("Setting target to %d (%d us).\n", target, target/4);
   maestroSetTarget(fd, 0, target);
  

@@ -16,10 +16,10 @@ int serialport_read_until(int fd, char* buf, char until, int buf_max, int timeou
         if( n==0 ) {
             usleep( 1 * 1000 );  // wait 1 msec try again
             timeout--;
-            if( timeout==0 ) return -2;
+            if( timeout==0 ) { buf[i]=0; return -2; }
             continue;
         }
-        // printf("serialport_read_until: i=%d, n=%d b='%c'\n",i,n,b[0]); // debug
+        printf("serialport_read_until: i=%d, n=%d b='%c' (%02X)\n",i,n,b[0], b[0]); // debug
         buf[i] = b[0]; 
         i++;
     } while( b[0] != until && i < buf_max && timeout>0 );
@@ -91,15 +91,30 @@ int main()
     perror("error writing");
     return -1;
   }
-  printf("Wrote command: %s (%d bytes)", verCmd, n);
+  printf("Wrote command: %s (%d bytes)\n", verCmd, n);
 
   usleep(500000);
   
   printf("Reading...\n");
   n = serialport_read_until(fd, versionString, '\n', 100, 2000);
   printf("serialport_read_until returned %d.\n", n);
-  if ( n == 0 ) {
-    printf("Read: %s.\n", versionString);
+  if ( n != -1 ) {
+    printf("Read: %s\n(%d chars)\n", versionString, strlen(versionString));
+    printf("Byte %d: %02X\n", strlen(versionString)-1, versionString[strlen(versionString)-1]);
+  }
+
+  tcflush(fd, TCIOFLUSH);
+
+  n = serialport_read_until(fd, versionString, '\n', 100, 2000);
+  printf("serialport_read_until returned %d.\n", n);
+  if ( n != -1 ) {
+    printf("Byte 0: %02X\n", versionString[0]);
+  }
+
+  n = serialport_read_until(fd, versionString, '\n', 100, 2000);
+  printf("serialport_read_until returned %d.\n", n);
+  if ( n != -1 ) {
+    printf("Byte 0: %02X\n", versionString[0]);
   }
 
 /*  int br = -1;
