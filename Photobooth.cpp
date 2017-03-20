@@ -324,6 +324,7 @@ int main()
     if ( keepDispensing == 1 ) {
       // Close the gate and take a picture or two!
       maestroSetTarget(servoFD, 0, INLET_GATE_CLOSED);
+      usleep(1000000);
 
       CGrabResultPtr ptrGrabResult;
       char filename[100]; int imgCount;
@@ -336,7 +337,25 @@ int main()
       usleep(1000000);
       
       // Now spin the vanes
+      // send "S" to Arduino
+      tcflush(arduinoFD, TCIOFLUSH);
+      n = write(arduinoFD, "S\n", 2);
+      if ( n != 2 ) { perror("error writing to arduino"); return 1; }
 
+      usleep(500000);
+
+      n = serialport_read_until(arduinoFD, replyString, '\n', 100, 2000);
+      if ( n == 0 ) {
+        if ( strcmp(replyString, "S\n") == 0 ) {
+          printf("Spun vanes.\n");
+        } else {
+          printf("Expected 'S' from arduino, received: '%s'\n", replyString);
+        }
+      } else {
+        perror("error reading from arduino"); return 1;
+      }
+
+      usleep(1000000);
 
       lower.StartGrabbing(3);
 
@@ -376,20 +395,77 @@ int main()
         }
       }
 
-      // For now, be done.
+      // Spin the vanes back
+      // send "S" to Arduino
+      tcflush(arduinoFD, TCIOFLUSH);
+      n = write(arduinoFD, "S\n", 2);
+      if ( n != 2 ) { perror("error writing to arduino"); return 1; }
+
+      usleep(500000);
+
+      n = serialport_read_until(arduinoFD, replyString, '\n', 100, 2000);
+      if ( n == 0 ) {
+        if ( strcmp(replyString, "S\n") == 0 ) {
+          printf("Spun vanes back.\n");
+        } else {
+          printf("Expected 'S' from arduino, received: '%s'\n", replyString);
+        }
+      } else {
+        perror("error reading from arduino"); return 1;
+      }
+
       maestroSetTarget(servoFD, 1, OUTLET_GATE_OPEN);
 
-      keepDispensing = 0;
+      tcflush(arduinoFD, TCIOFLUSH);
+      usleep(100000);
 
+      n = write(arduinoFD, "P\n", 2);
+      if ( n != 2 ) { perror("error writing to arduino"); return 1; }
+
+      usleep(500000);
+
+      n = serialport_read_until(arduinoFD, replyString, '\n', 100, 2000);
+      if ( n == 0 ) {
+        if ( strcmp(replyString, "P\n") == 0 ) {
+          printf("Pump on.\n");
+        } else {
+          printf("Expected 'P' from arduino, received: '%s'\n", replyString);
+        }
+      } else {
+        perror("error reading from arduino"); return 1;
+      }
+
+      usleep(3000000);
+
+      tcflush(arduinoFD, TCIOFLUSH);
+      n = write(arduinoFD, "p\n", 2);
+      if ( n != 2 ) { perror("error writing to arduino"); return 1; }
+
+      usleep(500000);
+
+      n = serialport_read_until(arduinoFD, replyString, '\n', 100, 2000);
+      if ( n == 0 ) {
+        if ( strcmp(replyString, "p\n") == 0 ) {
+          printf("Pump off.\n");
+        } else {
+          printf("Expected 'p' from arduino, received: '%s'\n", replyString);
+        }
+      } else {
+        perror("error reading from arduino"); return 1;
+      }
+
+      keepDispensing = 0;
 
     }
 
   }
 
   // Cleanup
+  n = write(arduinoFD, "s\n", 2);
+  if ( n != 2 ) { perror("error writing to arduino"); return 1; }
 
   maestroSetTarget(servoFD, 0, INLET_GATE_OPEN);
-  maestroSetTarget(servoFD, 1, OUTLET_GATE_OPEN);
+  maestroSetTarget(servoFD, 1, OUTLET_GATE_CLOSED);
 
   upper.Close();
   lower.Close();
