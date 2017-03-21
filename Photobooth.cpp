@@ -13,6 +13,8 @@
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/highgui/highgui.hpp"
 
+#include "PhotoFuncs.h"
+
 using namespace cv;
 using namespace Pylon;
 using namespace std;
@@ -35,129 +37,6 @@ using namespace std;
 const char *servoCtrl = "/dev/ttyACM0";
 const char *dispenser = "/dev/ttyACM2";
 const char *arduino   = "/dev/ttyUSB0";
-
-#define  INLET_GATE_OPEN   7100
-#define  INLET_GATE_CLOSED 5400
-
-#define OUTLET_GATE_OPEN   4500
-#define OUTLET_GATE_CLOSED 6500
-
-// NOTE: The Maestro's serial mode must be set to "USB Dual Port".
-
-// Gets the position of a Maestro channel.
-// See the "Serial Servo Commands" section of the user's guide.
-int maestroGetPosition(int fd, unsigned char channel)
-{
-  unsigned char command[] = {0x90, channel};
-  if(write(fd, command, sizeof(command)) == -1)
-  {
-    perror("error writing");
-    return -1;
-  }
-  printf("mgp: wrote command %02X %02X.\n", command[0], command[1]);
-
-  usleep(50000);
- 
-  unsigned char response[2];
-  if(read(fd,response,2) != 2)
-  {
-    perror("error reading");
-    return -1;
-  }
-  printf("mgp: read response %02X %02X.\n", response[0], response[1]);
- 
-  return response[0] + 256*response[1];
-}
- 
-// Sets the target of a Maestro channel.
-// See the "Serial Servo Commands" section of the user's guide.
-// The units of 'target' are quarter-microseconds.
-int maestroSetTarget(int fd, unsigned char channel, unsigned short target)
-{
-  unsigned char command[] = {0x84, channel, target & 0x7F, target >> 7 & 0x7F};
-  if (write(fd, command, sizeof(command)) == -1)
-  {
-    perror("error writing");
-    return -1;
-  }
-  return 0;
-}
-
-int openSerialPort(const char *dev) {
-
-  int fd = open(dev, O_RDWR | O_SYNC );
-  if (fd == -1)
-  {
-    perror(dev);
-    return -1;
-  } else {
-    printf("FD opened (%d) for device: %s.\n", fd, dev);
-  }
- 
-  struct termios options;
-  if ( tcgetattr(fd, &options) < 0 ) {
-    printf("Error reading termios option.\n");
-    close(fd);
-    return -1;
-  }
-
-  cfsetispeed(&options, B9600);
-  cfsetospeed(&options, B9600);
-
-  // 8N1
-  options.c_cflag &= ~PARENB;
-  options.c_cflag &= ~CSTOPB;
-  options.c_cflag &= ~CSIZE;
-  options.c_cflag |= CS8;
-  // no flow control
-  options.c_cflag &= ~CRTSCTS;
-
-  //options.c_cflag &= ~HUPCL; // disable hang-up-on-close to avoid reset
-
-  options.c_cflag |= CREAD | CLOCAL;  // turn on READ & ignore ctrl lines
-  options.c_iflag &= ~(IXON | IXOFF | IXANY); // turn off s/w flow ctrl
-
-  options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // make raw
-  options.c_oflag &= ~OPOST; // make raw
-
-  // see: http://unixwiz.net/techtips/termios-vmin-vtime.html
-  options.c_cc[VMIN]  = 0;
-  options.c_cc[VTIME] = 0;
-  //options.c_cc[VTIME] = 20;
-    
-  tcsetattr(fd, TCSANOW, &options);
-  if( tcsetattr(fd, TCSAFLUSH, &options) < 0) {
-    perror("init_serialport: Couldn't set term attributes");
-    close(fd);
-    return -1;
-  }
-
-  printf("Options set.\n");
-
-  return fd;
-}
-
-int serialport_read_until(int fd, char* buf, char until, int buf_max, int timeout)
-{
-    char b[1];  // read expects an array, so we give it a 1-byte array
-    int i=0;
-    do { 
-        int n = read(fd, b, 1);  // read a char at a time
-        if( n==-1) return -1;    // couldn't read
-        if( n==0 ) {
-            usleep( 1 * 1000 );  // wait 1 msec try again
-            timeout--;
-            if( timeout==0 ) { buf[i]=0; return -2; }
-            continue;
-        }
-        // printf("sp_r_u: i=%d, n=%d b='%c'\n",i,n,b[0]); // debug
-        buf[i] = b[0]; 
-        i++;
-    } while( b[0] != until && i < buf_max && timeout>0 );
-
-    buf[i] = 0;  // null terminate the string
-    return 0;
-}
 
 int main()
 {
@@ -197,7 +76,7 @@ int main()
    
   }
  
-  usleep(1500000);
+  usleep(1000000);
 
   printf("Current positions are %d and %d.\n", maestroGetPosition(servoFD, 0),
     maestroGetPosition(servoFD, 1));
@@ -205,43 +84,16 @@ int main()
   maestroSetTarget(servoFD, 0, INLET_GATE_OPEN);
   maestroSetTarget(servoFD, 1, OUTLET_GATE_CLOSED);
 
-  // maestroSetTarget(servoFD, 0, INLET_GATE_CLOSED);
-  // maestroSetTarget(servoFD, 1, OUTLET_GATE_CLOSED);
-  // maestroSetTarget(servoFD, 1, OUTLET_GATE_CLOSED);
-
-  n = write(dispenserFD, "I", 1);
-  if ( n != 1 ) { perror("error writing to dispenser"); return 1; }
-
-  usleep(1500000);
-
-  n = serialport_read_until(dispenserFD, replyString, '\n', 100, 2000);
-  if ( n == 0 ) {
-    if ( strcmp(replyString, "ok\n") == 0 ) {
-      printf("Dispenser initialized.\n");
-    } else {
-      printf("Expected 'ok' from dispenser, received: '%s'\n", replyString);
-    }
-    tcflush(dispenserFD, TCIOFLUSH);
-  } else {
-    perror("error reading from dispenser"); return 1;
+  if ( initDispenser(dispenserFD) != 0 ) {
+    perror("error initializing dispenser"); return 1;
   }
 
-  n = write(arduinoFD, "A\n", 2);
-  if ( n != 2 ) { perror("error writing to arduino"); return 1; }
-
-  usleep(500000);
-
-  n = serialport_read_until(arduinoFD, replyString, '\n', 100, 2000);
-  if ( n == 0 ) {
-    if ( strcmp(replyString, "A\n") == 0 ) {
-      printf("Arduino initialized.\n");
-    } else {
-      printf("Expected 'A' from arduino, received: '%s'\n", replyString);
-    }
-  } else {
-    perror("error reading from arduino"); return 1;
+  if ( enableLights(arduinoFD) != 0 ) {
+    perror("error enabling lights"); return 1;
   }
 
+  printf("Dispenser initialized, lights enabled.\n");
+    
   try
   {
     // Get the transport layer factory.
@@ -275,28 +127,24 @@ int main()
       << e.GetDescription() << endl;
     return 1;
   }
+
+  printf("Cameras all set up.\n");
  
 
   // Now we're all set up.
 
   int keepDispensing = 1;
+
   while ( keepDispensing ) {
-    n = write(dispenserFD, "F", 1);
-    if ( n != 1 ) { perror("error writing to Dispenser"); return 1; }
-    
-    usleep(1500000);
- 
-    n = serialport_read_until(dispenserFD, replyString, '\n', 100, 2000);
-    if ( n == 0 ) {
-      if ( strcmp(replyString, "ok\n") == 0 ) {
-        printf("Dispensing fly.\n");
-      } else {
-        printf("Expected 'ok' from dispenser, received: '%s'\n", replyString);
-      }
-      tcflush(dispenserFD, TCIOFLUSH);
-    } else {
-      perror("error reading from dispenser"); return 1;
+    printf("Dispensing fly.\n");
+
+    usleep(100000);
+    if ( dispenseFly(dispenserFD) != 0 ) {
+      perror("error dispensing fly"); return 1;
     }
+
+    usleep(100000);
+    tcflush(dispenserFD, TCIOFLUSH);
 
     // Now read status of dispenser (up to 20 s delay):
     //   f = fly dispensed
@@ -314,7 +162,7 @@ int main()
         printf("Dispensed fly but didn't see at detector.\n");
         keepDispensing = 0;
       } else {
-        printf("Expected 'ok' from dispenser, received: '%s'\n", replyString);
+        printf("After dispense, expected 'ok' from dispenser, received: '%s'\n", replyString);
       }
       tcflush(dispenserFD, TCIOFLUSH);
     } else {
@@ -337,22 +185,8 @@ int main()
       usleep(1000000);
       
       // Now spin the vanes
-      // send "S" to Arduino
-      tcflush(arduinoFD, TCIOFLUSH);
-      n = write(arduinoFD, "S\n", 2);
-      if ( n != 2 ) { perror("error writing to arduino"); return 1; }
-
-      usleep(500000);
-
-      n = serialport_read_until(arduinoFD, replyString, '\n', 100, 2000);
-      if ( n == 0 ) {
-        if ( strcmp(replyString, "S\n") == 0 ) {
-          printf("Spun vanes.\n");
-        } else {
-          printf("Expected 'S' from arduino, received: '%s'\n", replyString);
-        }
-      } else {
-        perror("error reading from arduino"); return 1;
+      if ( stepVanes(arduinoFD) != 0 ) {
+        perror("error stepping vanes"); return 1;
       }
 
       usleep(1000000);
@@ -396,62 +230,22 @@ int main()
       }
 
       // Spin the vanes back
-      // send "S" to Arduino
-      tcflush(arduinoFD, TCIOFLUSH);
-      n = write(arduinoFD, "S\n", 2);
-      if ( n != 2 ) { perror("error writing to arduino"); return 1; }
-
-      usleep(500000);
-
-      n = serialport_read_until(arduinoFD, replyString, '\n', 100, 2000);
-      if ( n == 0 ) {
-        if ( strcmp(replyString, "S\n") == 0 ) {
-          printf("Spun vanes back.\n");
-        } else {
-          printf("Expected 'S' from arduino, received: '%s'\n", replyString);
-        }
-      } else {
-        perror("error reading from arduino"); return 1;
+      if ( stepVanes(arduinoFD) != 0 ) {
+        perror("error stepping vanes"); return 1;
       }
 
       maestroSetTarget(servoFD, 1, OUTLET_GATE_OPEN);
 
-      tcflush(arduinoFD, TCIOFLUSH);
       usleep(100000);
 
-      n = write(arduinoFD, "P\n", 2);
-      if ( n != 2 ) { perror("error writing to arduino"); return 1; }
-
-      usleep(500000);
-
-      n = serialport_read_until(arduinoFD, replyString, '\n', 100, 2000);
-      if ( n == 0 ) {
-        if ( strcmp(replyString, "P\n") == 0 ) {
-          printf("Pump on.\n");
-        } else {
-          printf("Expected 'P' from arduino, received: '%s'\n", replyString);
-        }
-      } else {
-        perror("error reading from arduino"); return 1;
+      if ( pumpOn(arduinoFD) != 0 ) {
+        perror("error turning on pump"); return 1;
       }
 
       usleep(3000000);
 
-      tcflush(arduinoFD, TCIOFLUSH);
-      n = write(arduinoFD, "p\n", 2);
-      if ( n != 2 ) { perror("error writing to arduino"); return 1; }
-
-      usleep(500000);
-
-      n = serialport_read_until(arduinoFD, replyString, '\n', 100, 2000);
-      if ( n == 0 ) {
-        if ( strcmp(replyString, "p\n") == 0 ) {
-          printf("Pump off.\n");
-        } else {
-          printf("Expected 'p' from arduino, received: '%s'\n", replyString);
-        }
-      } else {
-        perror("error reading from arduino"); return 1;
+      if ( pumpOff(arduinoFD) != 0 ) {
+        perror("error turning on pump"); return 1;
       }
 
       keepDispensing = 0;
@@ -461,8 +255,7 @@ int main()
   }
 
   // Cleanup
-  n = write(arduinoFD, "s\n", 2);
-  if ( n != 2 ) { perror("error writing to arduino"); return 1; }
+  stepperOff(arduinoFD);
 
   maestroSetTarget(servoFD, 0, INLET_GATE_OPEN);
   maestroSetTarget(servoFD, 1, OUTLET_GATE_CLOSED);
