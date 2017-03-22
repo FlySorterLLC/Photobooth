@@ -10,9 +10,15 @@ LDLIBS     := $(shell $(PYLON_ROOT)/bin/pylon-config --libs)
 WPLFLAGS   := -lwiringPi -lpthread
 CVLFLAGS   := -lopencv_core -lopencv_imgproc -lopencv_highgui 
 
-all: Photobooth PhotoFuncs.o ServoTest CameraTest GPIOTest ArduinoTest DispenserTest OpenCVTest
+all: Photobooth PhotoFuncs.o ServoTest CameraTest GPIOTest ArduinoTest DispenserTest OpenCVTest HandLoad
 
 PhotoFuncs.o: PhotoFuncs.cpp
+	 $(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
+
+HandLoad: HandLoad.o PhotoFuncs.o
+	 $(LD) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(CVLFLAGS) $(WPLFLAGS)
+
+HandLoad.o: HandLoad.cpp
 	 $(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
 Photobooth: Photobooth.o PhotoFuncs.o
@@ -58,4 +64,4 @@ GPIOTest.o: GPIOTest.c
 	$(CXX) -c -o $@ $<
 
 clean:
-	 $(RM) *.o Photobooth ServoTest CameraTest GPIOTest ArduinoTest DispenserTest
+	 $(RM) *.o Photobooth ServoTest CameraTest GPIOTest ArduinoTest DispenserTest HandLoad

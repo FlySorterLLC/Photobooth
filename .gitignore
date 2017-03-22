@@ -6,6 +6,7 @@ ArduinoTest
 OpenCVTest
 DispenserTest
 GPIOTest
+HandLoad
 
 # Object files
 *.o
