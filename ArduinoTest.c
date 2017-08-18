@@ -85,7 +85,7 @@ int main(int argc, char **argv)
   usleep(1500000);
 
   char versionString[100];
-  const char *verCmd = "A\n";
+  const char *verCmd = "A";
 
   int n, l;
   if ( argc > 1 ) {
